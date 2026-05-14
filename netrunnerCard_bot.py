@@ -35,16 +35,10 @@ logger = logging.getLogger(__name__)
 # ── NetrunnerDB API ────────────────────────────────────────────────────────────
 
 def search_card(card_name: str) -> Optional[dict]:
-    """
-    Search for a card by exact title via the printings endpoint.
-    Returns the first matching printing's attributes dict, or None.
-    """
-    # Use title:"..." for exact-title search; distinct_cards avoids duplicates
-    query = f'title:"{card_name}"'
     params = {
-        "filter[search]": query,
+        "filter[search]": card_name,
         "filter[distinct_cards]": "true",
-        "page[size]": 1,
+        "page[size]": 10,
     }
     headers = {"Accept": "application/json", "User-Agent": "NetrunnerTelegramBot/1.0"}
 
@@ -63,46 +57,18 @@ def search_card(card_name: str) -> Optional[dict]:
 
     results = data.get("data", [])
     if not results:
-        # Fallback: try a fuzzy search without quotes
-        return _fuzzy_search(card_name)
-
-    printing = results[0]
-    attrs = printing.get("attributes", {})
-    attrs["_printing_id"] = printing.get("id", "")
-    attrs["_card_id"] = attrs.get("card_id", printing.get("id", ""))
-    return attrs
-
-
-def _fuzzy_search(card_name: str) -> Optional[dict]:
-    """Fallback: search without quotes for partial matches."""
-    params = {
-        "filter[search]": card_name,
-        "filter[distinct_cards]": "true",
-        "page[size]": 1,
-    }
-    headers = {"Accept": "application/json", "User-Agent": "NetrunnerTelegramBot/1.0"}
-
-    try:
-        resp = requests.get(
-            f"{NRDB_API_BASE}/printings",
-            params=params,
-            headers=headers,
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.RequestException as e:
-        logger.error("Fuzzy API error for %r: %s", card_name, e)
         return None
 
-    results = data.get("data", [])
-    if not results:
-        return None
+    # Prefer exact title match (case-insensitive)
+    needle = card_name.strip().lower()
+    best = next(
+        (r for r in results if r["attributes"].get("stripped_title", "").lower() == needle),
+        results[0],  # fall back to first result
+    )
 
-    printing = results[0]
-    attrs = printing.get("attributes", {})
-    attrs["_printing_id"] = printing.get("id", "")
-    attrs["_card_id"] = attrs.get("card_id", printing.get("id", ""))
+    attrs = best["attributes"]
+    attrs["_printing_id"] = best["id"]
+    attrs["_card_id"] = attrs.get("card_id", best["id"])
     return attrs
 
 
