@@ -7,6 +7,7 @@ Uses the NetrunnerDB v3 API: https://api.netrunnerdb.com
 
 import re
 import logging
+import unicodedata
 import urllib.parse
 from typing import Optional
 
