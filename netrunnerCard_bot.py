@@ -32,11 +32,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def clean_query(s: str) -> str:
+    """Normalize unicode and remove characters that break the NRDB API."""
+    # Normalize unicode (curly quotes → ascii equivalents)
+    s = unicodedata.normalize("NFKD", s)
+    # Remove apostrophes and similar characters
+    s = re.sub(r"[''`´'\"\\]", " ", s)
+    return s.strip()
+
 # ── NetrunnerDB API ────────────────────────────────────────────────────────────
 
 def search_card(card_name: str) -> Optional[dict]:
+    
+    query = clean_query(card_name)
     params = {
-        "filter[search]": card_name,
+        "filter[search]": query,
         "filter[distinct_cards]": "true",
         "page[size]": 10,
     }
